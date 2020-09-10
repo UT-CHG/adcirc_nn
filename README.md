@@ -27,9 +27,9 @@ Following steps are needed to properly install AdcircNN on Linux:
 * Run the following commands to clone this repository, change the directory, and
   pip-install AdcircNN.
   ```bash
-  git clone https://github.com/UT-CHG/adcirc_nn.git`
+  git clone https://github.com/UT-CHG/adcirc_nn.git
   cd adcirc_nn
-  python -m pip install .
+  python3 -m pip install .
   ```
 * You should now be able to `import adcirc_nn` in Python, if needed.
 
