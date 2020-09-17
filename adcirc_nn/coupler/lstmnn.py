@@ -7,6 +7,10 @@
 The Long Short Term Memory Neural Network module.
 """
 import numpy as np
+import yaml
+import torch
+
+from RunoffLSTM import RunoffLSTM
 
 NN_TIME_FACTOR = 1.0 # No conversion for now. Seconds to seconds
 
@@ -58,16 +62,25 @@ class LongShortTermMemoryNN_class():
         self.tprev = self.timer
         self.tfinal = self.niter
 
+        # load LSTM model
+        self.nn_model = self._load_nn_model() # provide path if not in the same folder
+
+
     #--------------------------------------------------------------------------#
     def run(self):
         """Run the LSTM NN object."""
 
         # Run the NN model. For now, just set the dummy value for next "t"
         while (self.timer < self.niter):
-            self.vout = self.vbcfunc(self.timer + self.dt)
-            self.qout = self.qbcfunc(self.timer + self.dt)
+            self.vout = self.vbcfunc(self.timer + self.dt) # cumulative discharge
+            self.qout = self.qbcfunc(self.timer + self.dt) # flux at outlet node
             # Increment model time
             self.timer += self.dt
+
+            # Time step of NN model
+            if first_step: # TODO: self.timer == 0?
+                hidden = (self.nn_model.c0, self.nn_model.h0)
+            y, hidden = self.nn_model(X, hidden) # TODO: X is input to the nn model
 
         return 0
 
@@ -76,4 +89,53 @@ class LongShortTermMemoryNN_class():
         """Finalize LSTM NN object."""
         # Do nothing for now
         pass
+
+    def _load_nn_model(self, path=''):
+        # load model parameters
+        with open(path+"model_parameters.yaml", 'r+') as f:
+            model_parameters = yaml.load(f)
+        features = model_parameters['features']
+        input_dim = len(features)
+        hidden_size = model_parameters['hidden_size']
+        output_dim = model_parameters['output_dim']
+        num_layers = model_parameters['num_layers']
+        learning_rate = model_parameters['learning_rate']
+        activation = model_parameters['activation']
+        dropout = model_parameters['dropout']
+        l2_regularization = model_parameters['l2_regularization']
+        
+        # instantiate nn and optimizer
+        model = RunoffLSTM(
+            input_dim, 
+            hidden_size, 
+            output_dim, 
+            num_layers, 
+            dropout,
+            activation,
+        )
+
+        # instantiate optimizer
+        optimizer = torch.optim.Adam(
+            model.parameters(), 
+            lr=learning_rate, 
+            amsgrad=True, 
+            weight_decay=l2_regularization
+        )
+
+        # load PyTorch checkpoint
+        checkpoint = torch.load(
+            path+"model.pt", 
+            map_location=lambda storage, 
+            location: storage
+        ) # load cuda model to cpu machine
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        epoch = checkpoint['epoch']
+        loss = checkpoint['loss']
+        print("Number of epoch: {epoch}".format(epoch=epoch))
+        print("Training loss: {loss}".format(epoch=loss)) # TODO: better message
+
+        model.eval()
+
+        return model
 
