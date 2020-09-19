@@ -16,39 +16,16 @@ def adcirc_init_bc_from_nn_hydrograph(anns): # anns is an AdcircNN_class object
     ######################################################
     #SET UP ADCIRC BC series and edgestring.
     ######################################################
-    assert(anns.pb.ibtype[anns.adcircedgestringid] == 22)
-
-    ######################################################
-    # Store the length of the coupled ADCIRC edge string
-    for inode in range(1,anns.adcircedgestringnnodes):
-        # -1 needed below since Python is 0 indexed whereas Fortan node numbers are 1-indexed
-        n1 = anns.pb.nbvv[anns.adcircedgestringid][inode  ]-1
-        n2 = anns.pb.nbvv[anns.adcircedgestringid][inode+1]-1
-        x1 = anns.pm.x[n1]
-        y1 = anns.pm.y[n1]
-        x2 = anns.pm.x[n2]
-        y2 = anns.pm.y[n2]
-        delx = x2-x1
-        dely = y2-y1
-        anns.adcircedgestringlen += np.sqrt(delx*delx+dely*dely)
-        if anns.pu.debug == anns.pu.on and DEBUG_LOCAL != 0:
-            print(f"Nodes {n1}({x1},{y1}),{n2}({x2},{y2})")
-    if anns.pu.messg==anns.pu.on:
-        anns.adcircedgestringlen = anns.pmsg.pymessg_dbl_sum(anns.adcircedgestringlen, anns.adcirc_comm_comp)
-    if anns.pu.debug == anns.pu.on and DEBUG_LOCAL != 0:
-        print(f"Edge string({anns.adcircedgestringid+1}): Length = {anns.adcircedgestringlen}")
-
-    ######################################################
     # Find series to modify during coupling.
     assert (SERIESLENGTH>=2)
 
     if anns.pu.debug == anns.pu.on and DEBUG_LOCAL != 0 and anns.myid==0:
-        nbvStartIndex=sum(anns.pb.nvell[:anns.adcircedgestringid])
-        print(f"Original: Flux time increment FTIMINC = {anns.pg.ftiminc}"
-                f"\nOriginal: Flux times:\nQTIME1 = {anns.pg.qtime1}"
-                f"\nQTIME2 = {anns.pg.qtime2}"
-                f"\nOriginal: Flux values:\nQNIN1  = {anns.pg.qnin1[nbvStartIndex : nbvStartIndex+anns.adcircedgestringnnodes]}"
-                f"\nQNIN2  = {anns.pg.qnin2[nbvStartIndex : nbvStartIndex+anns.adcircedgestringnnodes]}")
+        db_el_StartIndex=sum(anns.pb.nvdll[:anns.adcircedgestringid])
+        print(f"Original: Elevation series time increment ETIMINC = {anns.pg.etiminc}"
+                f"\nOriginal: Flux times:\nETIME1 = {anns.pg.etime1}"
+                f"\nETIME2 = {anns.pg.etime2}"
+                f"\nOriginal: Flux values:\nESBIN1  = {anns.pg.esbin1[db_el_StartIndex : db_el_StartIndex+anns.adcircedgestringnnodes]}"
+                f"\nESBIN2  = {anns.pg.esbin2[db_el_StartIndex : db_el_StartIndex+anns.adcircedgestringnnodes]}")
 
     ##################################################
     # Replace the flux time increment value.
@@ -61,42 +38,39 @@ def adcirc_init_bc_from_nn_hydrograph(anns): # anns is an AdcircNN_class object
         superdt -= anns.adcirctstart
 
     #assert(anns.adcircdt>anns.nn.dt) #If this is true, then superdt = either adcirctstart or adcircdt.
-    anns.pg.ftiminc = superdt
+    anns.pg.etiminc = superdt
 
     ######################################################
-    # Close the original fort.20, write a new one with a different name, and reopen it for reading
-    errorio = anns.pu.pycloseopenedfileforread(20)
+    # Close the original fort.19, write a new one with a different name, and reopen it for reading
+    errorio = anns.pu.pycloseopenedfileforread(19)
     assert(errorio==0)
 
-    # Replace the fort.20 file.
-    with open(anns.adcircfort20pathname, 'w') as fort20file:
-        [fort20file.write('0.0\n') for i in range(anns.adcircedgestringnnodes*SERIESLENGTH)]
+    # Replace the fort.19 file.
+    with open(anns.adcircfort19pathname, 'w') as fort19file:
+        [fort19file.write('0.0\n') for i in range(anns.adcircedgestringnnodes*SERIESLENGTH)]
 
-    errorio = anns.pg.pyopenfileforread(20,anns.adcircfort20pathname)
+    errorio = anns.pg.pyopenfileforread(19,anns.adcircfort19pathname)
     assert(errorio==0)
 
     ##################################################
     # Replace the flux times and values.
-    nbvStartIndex=sum(anns.pb.nvell[:anns.adcircedgestringid])
-    anns.pg.qnin2[nbvStartIndex : nbvStartIndex+anns.adcircedgestringnnodes+1] = 0.0
-    with open(anns.adcircfort20pathname, 'w') as fort20file:
+    db_el_StartIndex=sum(anns.pb.nvdll[:anns.adcircedgestringid])
+    anns.pg.esbin2[db_el_StartIndex : db_el_StartIndex+anns.adcircedgestringnnodes+1] = 0.0
+    with open(anns.adcircfort19pathname, 'w') as fort19file:
         #Set series value to zero
         #anns.adcircseries[0].entry[i].value[0] = 0.0
         for dumm in range(SERIESLENGTH):
-            for i in range(anns.pb.nvel):
-                if anns.pb.lbcodei[i] in [2, 12, 22]:
-                    [fort20file.write('{0:10f}\n'.format(anns.pg.qnin2[i]))]
-                if anns.pb.lbcodei[i] == 32:
-                    [fort20file.write('{0:10f}  {1:10f}\n'.format(anns.pg.qnin2[i],anns.pg.enin2[i]))]
+            for i in range(anns.pb.neta):
+                [fort19file.write('{0:10f}\n'.format(anns.pg.esbin2[i]))]
         #Set starting time to <whatever>
         #anns.adcircseries[0].entry[i].time = anns.adcirctstart + i*superdt
         #if anns.couplingtype == 'AdndA':
         #    anns.adcircseries[0].entry[i].time += superdt # If 2-way AdndA, then time series has to be shifted ahead since ADCIRC goes first.
-    anns.pg.qtime1 = anns.adcirctstart-superdt
-    anns.pg.qtime2 = anns.pg.qtime1+anns.pg.ftiminc
+    anns.pg.etime1 = anns.adcirctstart-superdt
+    anns.pg.etime2 = anns.pg.etime1+anns.pg.etiminc
     if anns.couplingtype == 'AdndA':
-        anns.pg.qtime1 += superdt
-        anns.pg.qtime2 += superdt
+        anns.pg.etime1 += superdt
+        anns.pg.etime2 += superdt
     #for i in range(anns.adcircseries[0].size):
     #    anns.adcircseries[0].entry[i].value[0] = 0.0
     #    anns.adcircseries[0].entry[i].time = anns.adcirctstart - (anns.adcircseries[0].size-2-i)*superdt
@@ -109,16 +83,16 @@ def adcirc_init_bc_from_nn_hydrograph(anns): # anns is an AdcircNN_class object
         #    anns.adcircseries[0].entry[i].time -= anns.adcirctstart
         if anns.couplingtype != 'AdndA':
             #anns.adcircseries[0].entry[anns.adcircseries[0].size-2].time -= anns.adcirctstart
-            anns.pg.qtime1 -= anns.adcirctstart
-            anns.pg.ftiminc += anns.adcirctstart ## Gajanan gkc warning caution: Newly added in 03/2020
+            anns.pg.etime1 -= anns.adcirctstart
+            anns.pg.etiminc += anns.adcirctstart ## Gajanan gkc warning caution: Newly added in 03/2020
                                                ## Ensure this gets replaced in set_bc function.
 
     if anns.pu.debug == anns.pu.on and DEBUG_LOCAL != 0:
-        print(f"Replaced: Flux time increment FTIMINC = {anns.pg.ftiminc} "
-                f"\nReplaced: Flux times:\nQTIME1 = {anns.pg.qtime1} "
-                f"\nQTIME2 = {anns.pg.qtime2} "
-                f"\nReplaced: Flux values:\nQNIN1  = {anns.pg.qnin1[nbvStartIndex : nbvStartIndex+anns.adcircedgestringnnodes]} "
-                f"\nQNIN2  = {anns.pg.qnin2[nbvStartIndex : nbvStartIndex+anns.adcircedgestringnnodes]}")
+        print(f"Replaced: Flux time increment ETIMINC = {anns.pg.etiminc} "
+                f"\nReplaced: Flux times:\nETIME1 = {anns.pg.etime1} "
+                f"\nETIME2 = {anns.pg.etime2} "
+                f"\nReplaced: Flux values:\nESBIN1  = {anns.pg.esbin1[db_el_StartIndex : db_el_StartIndex+anns.adcircedgestringnnodes]} "
+                f"\nESBIN2  = {anns.pg.esbin2[db_el_StartIndex : db_el_StartIndex+anns.adcircedgestringnnodes]}")
 
 ################################################################################
 if __name__ == '__main__':
