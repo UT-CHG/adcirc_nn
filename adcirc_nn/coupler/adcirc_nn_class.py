@@ -57,7 +57,7 @@ class AdcircNN():
         self.adcircedgestringid=self.pu.unset_int
         self.adcircedgestringnnodes=self.pu.unset_int
         self.adcircedgestringlen=0.0
-        self.adcircfort20pathname=''
+        self.adcircfort19pathname=''
         self.adcirc_hprev=0.0   # Avg depth
         self.adcirc_hprev_len=0.0   # count
 
@@ -108,7 +108,7 @@ class AdcircNN():
         self.adcirctnext=self.adcirctprev
         self.adcirctfinal=(self.pg.statim + self.pg.rnday)*86400.0
         self.adcircntsteps=0+self.pmain.itime_end #Needed 0+ to prevent the two from being the same object :-/ Careful!!!!
-        self.adcircfort20pathname=''.join(np.append(np.char.strip(self.ps.inputdir),'/fort.20.new'))
+        self.adcircfort19pathname=''.join(np.append(np.char.strip(self.ps.inputdir),'/fort.19.new'))
         self.adcircedgestringid=int(argv[argc.value-1])-1
         self.adcircedgestringnnodes=self.pb.nvell[self.adcircedgestringid]
         self.adcircedgestringnodes=self.pb.nbvv[1:self.adcircedgestringnnodes]

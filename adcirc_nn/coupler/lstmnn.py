@@ -33,15 +33,14 @@ class LongShortTermMemoryNN_class():
 
         self.tprev = 0.0 # Double in seconds  # To be set to timer
         self.tfinal = 0.0 # Double in seconds # To be set to niter
-        self.voutprev=0.0
-        self.voutprev_t=0.0
+        self.elevprev=0.0
+        self.elevprev_t=0.0
 
         self.timefact=NN_TIME_FACTOR # Minutes to seconds conversion, since niter is in mins.
 
         #self.dummytimes = 0.0
         #self.dummyvalues = 0.0
-        self.vout = 0.0
-        self.qout = 0.0
+        self.elev = 0.0
 
         self.runflag = 1 # Only for use in coupling with ADCIRC.
 
@@ -53,8 +52,7 @@ class LongShortTermMemoryNN_class():
         self.dt = 60.0
         self.timer = 0
         self.niter = 21600
-        self.qbcfunc = lambda t : 1.0e1*(1-np.cos(2.0*np.pi * t / self.tfinal))
-        self.vbcfunc = lambda t : 1.0e1*(t-np.sin(2.0*np.pi * t / self.tfinal)*self.tfinal/4.0/np.pi)
+        self.elbcfunc = lambda t : 5.0e0*(1-np.cos(2.0*np.pi * t / self.tfinal))
         #self.dummytimes = np.arange(0.0, self.dt*5, self.tfinal)
         #self.dummyvalues = 1.0e3*(1-np.cos(4.0*np.pi/self.dummytimes))
 
@@ -72,8 +70,7 @@ class LongShortTermMemoryNN_class():
 
         # Run the NN model. For now, just set the dummy value for next "t"
         while (self.timer < self.niter):
-            self.vout = self.vbcfunc(self.timer + self.dt) # cumulative discharge
-            self.qout = self.qbcfunc(self.timer + self.dt) # flux at outlet node
+            self.elev = self.elbcfunc(self.timer + self.dt)
             # Increment model time
             self.timer += self.dt
 
