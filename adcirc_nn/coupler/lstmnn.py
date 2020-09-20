@@ -7,6 +7,7 @@
 The Long Short Term Memory Neural Network module.
 """
 import numpy as np
+import pandas as pd
 import yaml
 import torch
 
@@ -49,10 +50,10 @@ class LongShortTermMemoryNN_class():
         """Initialize LSTM NN object."""
 
         # Hard-coded values for now:
-        self.dt = 60.0
+        self.dt = 1 # 1 for one hour for now
         self.timer = 0
-        self.niter = 21600
-        self.elbcfunc = lambda t : 5.0e0*(1-np.cos(2.0*np.pi * t / self.tfinal))
+        self.niter = 100
+        # self.elbcfunc = lambda t : 5.0e0*(1-np.cos(2.0*np.pi * t / self.tfinal))
         #self.dummytimes = np.arange(0.0, self.dt*5, self.tfinal)
         #self.dummyvalues = 1.0e3*(1-np.cos(4.0*np.pi/self.dummytimes))
 
@@ -61,23 +62,47 @@ class LongShortTermMemoryNN_class():
         self.tfinal = self.niter
 
         # load LSTM model
-        self.nn_model = self._load_nn_model() # provide path if not in the same folder
+        self.nn_model = self._load_nn_model("nn_input/") # provide path if not in the same folder
 
+        # load nn input data
+        df = pd.read_csv("nn_input/event.csv")
+        features = [
+            '43057', 
+            '43060', 
+            '43053', 
+            '43059', 
+            '43047', 
+            '43058', 
+            '43052', 
+            '43050', 
+            '43160', 
+            '43054', 
+            '43051', 
+            '43049', 
+            '43056', 
+            '43091', 
+            '43055',
+            "Verified (ft)",
+        ]
+        self.features = df[features] # TODO: overwrite this variable during two way coupling
+        assert (self.niter <= len(df)), "lstm model does not have enough input data"
 
     #--------------------------------------------------------------------------#
     def run(self):
-        """Run the LSTM NN object."""
-
-        # Run the NN model. For now, just set the dummy value for next "t"
+        """
+        Run the LSTM NN object. For now, just set the dummy value for next "t"
+        """
         while (self.timer < self.niter):
-            self.elev = self.elbcfunc(self.timer + self.dt)
+            # Time step of NN model
+            if self.timer == 0:
+                hidden = (self.nn_model.c0, self.nn_model.h0)
+            # TODO: add scaler transform and inverse transform
+            X = torch.Tensor(self.features.loc[self.timer].values).view(1, 1, -1)
+            y, hidden = self.nn_model(X, hidden)
+            y = y.view(-1).numpy() # this is the wse prediction at adcirc boundary
+            self.elev = y
             # Increment model time
             self.timer += self.dt
-
-            # Time step of NN model
-            if first_step: # TODO: self.timer == 0?
-                hidden = (self.nn_model.c0, self.nn_model.h0)
-            y, hidden = self.nn_model(X, hidden) # TODO: X is input to the nn model
 
         return 0
 
