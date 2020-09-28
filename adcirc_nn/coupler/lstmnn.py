@@ -6,14 +6,16 @@
 """
 The Long Short Term Memory Neural Network module.
 """
+from os.path import join as ospathjoin
+
 import numpy as np
 import pandas as pd
 import yaml
 import torch
 
-from RunoffLSTM import RunoffLSTM
+from .RunoffLSTM import RunoffLSTM
 
-NN_TIME_FACTOR = 1.0 # No conversion for now. Seconds to seconds
+NN_TIME_FACTOR = 3600.0 # No conversion for now. Seconds to seconds
 
 #------------------------------------------------------------------------------#
 class LongShortTermMemoryNN_class():
@@ -25,7 +27,6 @@ class LongShortTermMemoryNN_class():
 
         self._DEBUG = 0
 
-        self.btime = 0.0 # Double in Julian date
         self.dt = 0.0  # Double in seconds
         self.timer = 0 # Integer in seconds
         self.niter = 0 # Integer in seconds
@@ -57,30 +58,31 @@ class LongShortTermMemoryNN_class():
         #self.dummytimes = np.arange(0.0, self.dt*5, self.tfinal)
         #self.dummyvalues = 1.0e3*(1-np.cos(4.0*np.pi/self.dummytimes))
 
-        self.btime = 0.0
         self.tprev = self.timer
         self.tfinal = self.niter
 
         # load LSTM model
-        self.nn_model = self._load_nn_model("nn_input/") # provide path if not in the same folder
+        nn_input_dir = "nn_input"
+        self.nn_model = self._load_nn_model(nn_input_dir) # provide path if not in the same folder
+        self.hidden = (self.nn_model.c0, self.nn_model.h0)
 
         # load nn input data
-        df = pd.read_csv("nn_input/event.csv")
+        df = pd.read_csv(ospathjoin(nn_input_dir, "event.csv"))
         features = [
-            '43057', 
-            '43060', 
-            '43053', 
-            '43059', 
-            '43047', 
-            '43058', 
-            '43052', 
-            '43050', 
-            '43160', 
-            '43054', 
-            '43051', 
-            '43049', 
-            '43056', 
-            '43091', 
+            '43057',
+            '43060',
+            '43053',
+            '43059',
+            '43047',
+            '43058',
+            '43052',
+            '43050',
+            '43160',
+            '43054',
+            '43051',
+            '43049',
+            '43056',
+            '43091',
             '43055',
             "Verified (ft)",
         ]
@@ -90,16 +92,14 @@ class LongShortTermMemoryNN_class():
     #--------------------------------------------------------------------------#
     def run(self):
         """
-        Run the LSTM NN object. For now, just set the dummy value for next "t"
+        Run the LSTM NN object.
         """
         while (self.timer < self.niter):
             # Time step of NN model
-            if self.timer == 0:
-                hidden = (self.nn_model.c0, self.nn_model.h0)
-            # TODO: add scaler transform and inverse transform
+            # TODO: add scalar transform and inverse transform
             X = torch.Tensor(self.features.loc[self.timer].values).view(1, 1, -1)
-            y, hidden = self.nn_model(X, hidden)
-            y = y.view(-1).numpy() # this is the wse prediction at adcirc boundary
+            y, self.hidden = self.nn_model(X, self.hidden)
+            y = y.view(-1).detach().numpy() # this is the wse prediction at adcirc boundary
             self.elev = y
             # Increment model time
             self.timer += self.dt
@@ -114,7 +114,7 @@ class LongShortTermMemoryNN_class():
 
     def _load_nn_model(self, path=''):
         # load model parameters
-        with open(path+"model_parameters.yaml", 'r+') as f:
+        with open(ospathjoin(path,"model_parameters.yaml"), 'r+') as f:
             model_parameters = yaml.load(f)
         features = model_parameters['features']
         input_dim = len(features)
@@ -125,29 +125,29 @@ class LongShortTermMemoryNN_class():
         activation = model_parameters['activation']
         dropout = model_parameters['dropout']
         l2_regularization = model_parameters['l2_regularization']
-        
+
         # instantiate nn and optimizer
         model = RunoffLSTM(
-            input_dim, 
-            hidden_size, 
-            output_dim, 
-            num_layers, 
+            input_dim,
+            hidden_size,
+            output_dim,
+            num_layers,
             dropout,
             activation,
         )
 
         # instantiate optimizer
         optimizer = torch.optim.Adam(
-            model.parameters(), 
-            lr=learning_rate, 
-            amsgrad=True, 
+            model.parameters(),
+            lr=learning_rate,
+            amsgrad=True,
             weight_decay=l2_regularization
         )
 
         # load PyTorch checkpoint
         checkpoint = torch.load(
-            path+"model.pt", 
-            map_location=lambda storage, 
+            ospathjoin(path,"model.pt"),
+            map_location=lambda storage,
             location: storage
         ) # load cuda model to cpu machine
         model.load_state_dict(checkpoint['model_state_dict'])
@@ -155,7 +155,7 @@ class LongShortTermMemoryNN_class():
         epoch = checkpoint['epoch']
         loss = checkpoint['loss']
         print("Number of epoch: {epoch}".format(epoch=epoch))
-        print("Training loss: {loss}".format(epoch=loss)) # TODO: better message
+        print("Training loss: {loss}".format(loss=loss)) # TODO: better message
 
         model.eval()
 
