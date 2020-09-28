@@ -22,13 +22,13 @@ def adcirc_init_bc_from_nn_hydrograph(anns): # anns is an AdcircNN_class object
     if anns.pu.debug == anns.pu.on and DEBUG_LOCAL != 0 and anns.myid==0:
         db_el_StartIndex=sum(anns.pb.nvdll[:anns.adcircedgestringid])
         print(f"Original: Elevation series time increment ETIMINC = {anns.pg.etiminc}"
-                f"\nOriginal: Flux times:\nETIME1 = {anns.pg.etime1}"
+                f"\nOriginal: Elev times:\nETIME1 = {anns.pg.etime1}"
                 f"\nETIME2 = {anns.pg.etime2}"
-                f"\nOriginal: Flux values:\nESBIN1  = {anns.pg.esbin1[db_el_StartIndex : db_el_StartIndex+anns.adcircedgestringnnodes]}"
+                f"\nOriginal: Elev values:\nESBIN1  = {anns.pg.esbin1[db_el_StartIndex : db_el_StartIndex+anns.adcircedgestringnnodes]}"
                 f"\nESBIN2  = {anns.pg.esbin2[db_el_StartIndex : db_el_StartIndex+anns.adcircedgestringnnodes]}")
 
     ##################################################
-    # Replace the flux time increment value.
+    # Replace the elevation time increment value.
     if anns.adcirctstart > 0.0: # NN starting time is before ADCIRC starting time; NN always starts at 0.0, hopefully!
         superdt = anns.adcircdt
     else:
@@ -53,7 +53,7 @@ def adcirc_init_bc_from_nn_hydrograph(anns): # anns is an AdcircNN_class object
     assert(errorio==0)
 
     ##################################################
-    # Replace the flux times and values.
+    # Replace the elevation times and values.
     db_el_StartIndex=sum(anns.pb.nvdll[:anns.adcircedgestringid])
     anns.pg.esbin2[db_el_StartIndex : db_el_StartIndex+anns.adcircedgestringnnodes+1] = 0.0
     with open(anns.adcircfort19pathname, 'w') as fort19file:
@@ -88,10 +88,10 @@ def adcirc_init_bc_from_nn_hydrograph(anns): # anns is an AdcircNN_class object
                                                ## Ensure this gets replaced in set_bc function.
 
     if anns.pu.debug == anns.pu.on and DEBUG_LOCAL != 0:
-        print(f"Replaced: Flux time increment ETIMINC = {anns.pg.etiminc} "
-                f"\nReplaced: Flux times:\nETIME1 = {anns.pg.etime1} "
+        print(f"Replaced: Elev time increment ETIMINC = {anns.pg.etiminc} "
+                f"\nReplaced: Elev times:\nETIME1 = {anns.pg.etime1} "
                 f"\nETIME2 = {anns.pg.etime2} "
-                f"\nReplaced: Flux values:\nESBIN1  = {anns.pg.esbin1[db_el_StartIndex : db_el_StartIndex+anns.adcircedgestringnnodes]} "
+                f"\nReplaced: Elev values:\nESBIN1  = {anns.pg.esbin1[db_el_StartIndex : db_el_StartIndex+anns.adcircedgestringnnodes]} "
                 f"\nESBIN2  = {anns.pg.esbin2[db_el_StartIndex : db_el_StartIndex+anns.adcircedgestringnnodes]}")
 
 ################################################################################
