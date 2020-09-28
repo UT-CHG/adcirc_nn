@@ -13,6 +13,7 @@ from pyADCIRC import libadcpy
 from .adcirc_init_bc_func import adcirc_init_bc_from_nn_hydrograph
 from .adcirc_set_bc_func  import adcirc_set_bc_from_nn_hydrograph
 from .lstmnn import LongShortTermMemoryNN_class as nn
+from .lstmnn import NN_TIME_FACTOR
 
 #------------------------------------------------------------------------------#
 TIME_TOL = 1.0e-3
@@ -115,9 +116,10 @@ class AdcircNN():
 
         self.nn.initialize()
         self.nn.runflag=self.pu.on
-        self.effectivenndt=self.nn.dt # in seconds. This is in case we decide to use single_event_end time as ending time
-        self.nntprev=self.nn.timer # in minutes
-        self.nntfinal=self.nn.niter # in minutes
+        self.nn._DEBUG=self.pu.on
+        self.effectivenndt=self.nn.dt*NN_TIME_FACTOR # MUST in seconds. This is in case we decide to use single_event_end time as ending time
+        self.nntprev=self.nn.timer
+        self.nntfinal=self.nn.niter
 
 
 
