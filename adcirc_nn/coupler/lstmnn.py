@@ -6,16 +6,21 @@
 """
 The Long Short Term Memory Neural Network module.
 """
+
+import os
 from os.path import join as ospathjoin
+import pickle
 
 import numpy as np
 import pandas as pd
-import yaml
+from sklearn.preprocessing import MinMaxScaler
 import torch
+import yaml
 
 from .RunoffLSTM import RunoffLSTM
 
 NN_TIME_FACTOR = 3600.0 # No conversion for now. Seconds to seconds
+NN_LENGTH_FACTOR = 0.3048 # Ft to meter conversion
 
 #------------------------------------------------------------------------------#
 class LongShortTermMemoryNN_class():
@@ -39,6 +44,7 @@ class LongShortTermMemoryNN_class():
         self.elevprev_t=0.0
 
         self.timefact=NN_TIME_FACTOR # Minutes to seconds conversion, since niter is in mins.
+        self.length_factor = NN_LENGTH_FACTOR # TODO: remember to do this conversion from adc to nn
 
         #self.dummytimes = 0.0
         #self.dummyvalues = 0.0
@@ -87,6 +93,11 @@ class LongShortTermMemoryNN_class():
             "Verified (ft)",
         ]
         self.features = df[features] # TODO: overwrite this variable during two way coupling
+        # separting rainfall and wse can be done by
+        # self.rainfall = self.features[rain_gages]
+        # self.wl = self.features["Verified (ft)"]
+        # and resemble them after overwriting wl
+        self.X_scaler, self.y_scaler = self._load_meta(nn_input_dir)
         assert (self.niter <= len(df)), "lstm model does not have enough input data"
 
     #--------------------------------------------------------------------------#
@@ -96,11 +107,14 @@ class LongShortTermMemoryNN_class():
         """
         while (self.timer < self.niter):
             # Time step of NN model
-            # TODO: add scalar transform and inverse transform
-            X = torch.Tensor(self.features.loc[self.timer].values).view(1, 1, -1)
+            X = self.X_scaler.transform(
+                self.features.loc[self.timer].values.reshape(1, -1)
+            )
+            X = torch.Tensor(X).view(1, 1, -1)
             y, self.hidden = self.nn_model(X, self.hidden)
-            y = y.view(-1).detach().numpy() # this is the wse prediction at adcirc boundary
-            self.elev = y
+            y = y.view(-1).detach().numpy()
+            self.elev = self.y_scaler.inverse_transform(y.reshape(1, -1)) * self.length_factor
+
             # Increment model time
             self.timer += self.dt
 
@@ -112,9 +126,17 @@ class LongShortTermMemoryNN_class():
         # Do nothing for now
         pass
 
+
+    def _load_meta(self,path=''):
+        with open(ospathjoin(path, "meta_data.pkl"), 'rb') as meta_data:
+            X_scaler, y_scaler = pickle.load(meta_data)
+        
+        return X_scaler, y_scaler
+
+
     def _load_nn_model(self, path=''):
         # load model parameters
-        with open(ospathjoin(path,"model_parameters.yaml"), 'r+') as f:
+        with open(ospathjoin(path, "model_parameters.yaml"), 'r+') as f:
             model_parameters = yaml.load(f)
         features = model_parameters['features']
         input_dim = len(features)
