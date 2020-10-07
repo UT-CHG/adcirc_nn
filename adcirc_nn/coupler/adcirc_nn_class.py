@@ -12,7 +12,10 @@ from pyADCIRC import libadcpy
 
 from .adcirc_init_bc_func import adcirc_init_bc_from_nn_hydrograph
 from .adcirc_set_bc_func  import adcirc_set_bc_from_nn_hydrograph
+from .nn_init_bc_func import nn_init_bc_from_adcirc_depths
+from .nn_set_bc_func  import nn_set_bc_from_adcirc_depths
 from .lstmnn import LongShortTermMemoryNN_class as nn
+from .input_ts import InputTS
 
 #------------------------------------------------------------------------------#
 TIME_TOL = 1.0e-3
@@ -57,6 +60,8 @@ class AdcircNN():
         self.adcircedgestringid=self.pu.unset_int
         self.adcircedgestringnnodes=self.pu.unset_int
         self.adcircedgestringlen=0.0
+        self.adcirc_coupled_nnodes=0
+        self.adcirc_coupled_nodes=[]
         self.adcircfort19pathname=''
         self.adcirc_hprev=0.0   # Avg depth
         self.adcirc_hprev_len=0.0   # count
@@ -64,6 +69,9 @@ class AdcircNN():
         # Neural Network data
         self.nn = nn()
         self.effectivenndt=0.0
+        self.nntprev=0
+        self.nntfinal=0
+        self.elevTS=[] # Elevation time series for the NN model
 
     #--------------------------------------------------------------------------#
     def coupler_initialize(self, argc, argv):
@@ -112,6 +120,8 @@ class AdcircNN():
         self.adcircedgestringid=int(argv[argc.value-1])-1
         self.adcircedgestringnnodes=self.pb.nvell[self.adcircedgestringid]
         self.adcircedgestringnodes=self.pb.nbvv[1:self.adcircedgestringnnodes]
+        self.adcirc_coupled_nnodes=1
+        self.adcirc_coupled_nodes=np.asfortranarray([1])
 
         self.nn.initialize()
         self.nn.runflag=self.pu.on
@@ -119,8 +129,8 @@ class AdcircNN():
         self.effectivenndt=self.nn.dt*self.nn.timefact # MUST be in seconds. This is in case we decide to use single_event_end time as ending time
         self.nntprev=self.nn.timer
         self.nntfinal=self.nn.niter
-
-
+        self.elevTS = InputTS(self.nn.series_elev_time, self.nn.series_elev_val.copy())
+        self.elevTS._getTimeInterval(self.nntprev*self.nn.timefact)
 
     #--------------------------------------------------------------------------#
     def coupler_finalize(self):
@@ -144,20 +154,20 @@ class AdcircNN():
         # Set final times to zero.
         self.pmain.itime_end = 0
         self.nn.niter = 0
-        # Run NN only on 1 processsor: PE 0.
-        if self.myid == 0:
-            ierr_code = self.nn.run()
-            assert(ierr_code == 0)
-            self.nn.go    = self.pu.on
-        else:
-            # Assumes NN cannot start at negative time!
-            self.nn.go    = self.pu.off
-        if self.pu.messg == self.pu.on:
-            if (self.pu.debug ==self.pu.on or DEBUG_LOCAL != 0):
-                print('PE[{}] Before messg: timer = {}'.format(self.myid,self.nn.timer))
-            self.nn.timer = self.pmsg.pymsg_dbl_max(self.nn.timer, self.adcirc_comm_comp)
-            if (self.pu.debug ==self.pu.on or DEBUG_LOCAL != 0):
-                print('PE[{}] After messg : timer = {}'.format(self.myid,self.nn.timer))
+        ## Run NN only on 1 processsor: PE 0.
+        #if self.myid == 0:
+        #    ierr_code = self.nn.run()
+        #    assert(ierr_code == 0)
+        #    self.nn.go    = self.pu.on
+        #else:
+        #    # Assumes NN cannot start at negative time!
+        #    self.nn.go    = self.pu.off
+        #if self.pu.messg == self.pu.on:
+        #    if (self.pu.debug ==self.pu.on or DEBUG_LOCAL != 0):
+        #        print('PE[{}] Before messg: timer = {}'.format(self.myid,self.nn.timer))
+        #    self.nn.timer = self.pmsg.pymsg_dbl_max(self.nn.timer, self.adcirc_comm_comp)
+        #    if (self.pu.debug ==self.pu.on or DEBUG_LOCAL != 0):
+        #        print('PE[{}] After messg : timer = {}'.format(self.myid,self.nn.timer))
 
         while (self.adcirctprev<self.adcirctfinal or self.nn.timer<self.nntfinal):
             ######################################################
@@ -165,15 +175,12 @@ class AdcircNN():
                 # Decided while writing report. Driving model must take at least one time step forward.
                 superdt = self.effectivenndt
                 while (self.nn.timer*self.nn.timefact + superdt < self.adcirctprev+self.adcircdt-TIME_TOL):
-                    superdt                    += self.effectivenndt
+                    superdt += self.effectivenndt
 
-                self.nn.niter               += int(max(1.0, (superdt+TIME_TOL)/self.nn.timefact))
-                # This one is the important one that determines end time:
-                #self.nn.single_event_end     = self.nn.b_lt_start + (self.nn.timer*self.nn.timefact + superdt)/86400.0 #Julian
+                self.nn.niter += int(max(1.0, (superdt+TIME_TOL)/self.nn.timefact))
 
                 if (self.adcircrunflag==self.pu.off): #If ADCIRC is done first, let NN finish off directly.
                     self.nn.niter            = self.nntfinal
-                    #self.nn.single_event_end = self.nn.b_lt_start + self.nn.niter/1440.0 #nntfinal was original niter in mins
 
                 if self.nn._DEBUG == self.pu.on and DEBUG_LOCAL != 0 and self.myid == 0:
                     print("\n*******************************************\nRunning NN:")
@@ -187,6 +194,7 @@ class AdcircNN():
 
                 # Run NN only on 1 processsor: PE 0.
                 if self.myid == 0:
+                    #self.elevTS.updateTimeInterval(self.nn.timer*self.nn.timefact)
                     ierr_code = self.nn.run()
                     assert(ierr_code == 0)
                     # Needed to force nn to run for next time step:
@@ -262,7 +270,7 @@ class AdcircNN():
             print(run_string)
             self.coupler_run_nn_driving_adcirc()
 
-        elif self.couplingtype == 'ndAdn':
+        elif self.couplingtype == 'AdndA':
             run_string = 'Running ADCIRC driving NN driving ADCIRC, Two-way coupling'
             print(run_string)
             self.coupler_run_adcirc_driving_nn()

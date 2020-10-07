@@ -7,7 +7,7 @@
 The Long Short Term Memory Neural Network module.
 """
 
-import os
+#import os
 from os.path import join as ospathjoin
 import pickle
 
@@ -19,7 +19,7 @@ import yaml
 
 from .RunoffLSTM import RunoffLSTM
 
-NN_TIME_FACTOR = 3600.0 # No conversion for now. Seconds to seconds
+NN_TIME_FACTOR = 3600.0 # Conversion factor for hours to seconds
 NN_LENGTH_FACTOR = 0.3048 # Ft to meter conversion
 
 #------------------------------------------------------------------------------#
@@ -35,7 +35,6 @@ class LongShortTermMemoryNN_class():
         self.dt = 0.0  # Double in seconds
         self.timer = 0 # Integer in seconds
         self.niter = 0 # Integer in seconds
-        self.single_event_end = 0 # Integer in minutes
         self.go = 1 # Integer flag for running or not running the model
 
         self.tprev = 0.0 # Double in seconds  # To be set to timer
@@ -43,12 +42,18 @@ class LongShortTermMemoryNN_class():
         self.elevprev=0.0
         self.elevprev_t=0.0
 
-        self.timefact=NN_TIME_FACTOR # Minutes to seconds conversion, since niter is in mins.
+        self.timefact=NN_TIME_FACTOR # Minutes to seconds conversion.
         self.length_factor = NN_LENGTH_FACTOR # TODO: remember to do this conversion from adc to nn
 
         #self.dummytimes = 0.0
         #self.dummyvalues = 0.0
         self.elev = 0.0
+
+        self.features = [] # Features used by the neural network model
+        self.featurecols = [] # Feature column names
+        self.series_rain_val = [] # Subset of features - Rainfall
+        self.series_elev_val = [] # Subset of features - Elevation
+        self.series_elev_time = [] # Subset of features - Elevation
 
         self.runflag = 1 # Only for use in coupling with ADCIRC.
 
@@ -73,8 +78,8 @@ class LongShortTermMemoryNN_class():
         self.hidden = (self.nn_model.c0, self.nn_model.h0)
 
         # load nn input data
-        df = pd.read_csv(ospathjoin(nn_input_dir, "event.csv"))
-        features = [
+        df = pd.read_csv(ospathjoin(nn_input_dir, "event.csv"))#, nrows = 9)
+        self.featurecols = [
             '43057',
             '43060',
             '43053',
@@ -92,11 +97,14 @@ class LongShortTermMemoryNN_class():
             '43055',
             "Verified (ft)",
         ]
-        self.features = df[features] # TODO: overwrite this variable during two way coupling
-        # separting rainfall and wse can be done by
-        # self.rainfall = self.features[rain_gages]
-        # self.wl = self.features["Verified (ft)"]
-        # and resemble them after overwriting wl
+        self.features = df[self.featurecols] # TODO: overwrite this variable during two way coupling
+        self.series_rain_val = self.features[self.featurecols[:-2]]
+        self.series_elev_val = self.features[self.featurecols[-1]]
+        self.series_elev_time = self.timefact * np.asfortranarray(
+                np.arange(self.timer,
+                          self.timer+len(self.series_elev_val)*self.dt,
+                          self.dt))
+
         self.X_scaler, self.y_scaler = self._load_meta(nn_input_dir)
         assert (self.niter <= len(df)), "lstm model does not have enough input data"
 
@@ -107,6 +115,8 @@ class LongShortTermMemoryNN_class():
         """
         while (self.timer < self.niter):
             # Time step of NN model
+            #print('NN timer = {0}'.format(self.timer))
+            #print(self.features[self.featurecols[-1]])
             X = self.X_scaler.transform(
                 self.features.loc[self.timer].values.reshape(1, -1)
             )
@@ -130,7 +140,7 @@ class LongShortTermMemoryNN_class():
     def _load_meta(self,path=''):
         with open(ospathjoin(path, "meta_data.pkl"), 'rb') as meta_data:
             X_scaler, y_scaler = pickle.load(meta_data)
-        
+
         return X_scaler, y_scaler
 
 
