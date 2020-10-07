@@ -12,8 +12,8 @@ from pyADCIRC import libadcpy
 
 from .adcirc_init_bc_func import adcirc_init_bc_from_nn_hydrograph
 from .adcirc_set_bc_func  import adcirc_set_bc_from_nn_hydrograph
-#from .nn_init_bc_func import nn_init_bc_from_adcirc_depths
-#from .nn_set_bc_func  import nn_set_bc_from_adcirc_depths
+from .nn_init_bc_func import nn_init_bc_from_adcirc_depths
+from .nn_set_bc_func  import nn_set_bc_from_adcirc_depths
 from .lstmnn import LongShortTermMemoryNN_class as nn
 from .input_ts import InputTS
 
@@ -248,6 +248,98 @@ class AdcircNN():
             ## Set NN Boundary conditions from ADCIRC
             if self.couplingtype == 'ndAdn':
                 nn_set_bc_from_adcirc_depths(self)
+
+    #--------------------------------------------------------------------------#
+    def coupler_run_adcirc_driving_nn(self):
+        """Run function with ADCIRC staying ahead of NN."""
+
+        nn_init_bc_from_adcirc_depths(self)
+        if self.couplingtype == 'AdndA':
+            adcirc_init_bc_from_nn_hydrograph(self)
+
+        # Set final times to zero.
+        self.pmain.itime_end = 0
+        self.nn.niter = 0
+
+        while (self.adcirctprev<self.adcirctfinal or self.nn.timer<self.nntfinal):
+            ######################################################
+            if (self.adcirctprev < self.adcirctfinal):
+                ntsteps = 0
+                while (self.adcirctnext < self.nn.timer*self.nn.timefact+self.effectivenndt-TIME_TOL):
+                    ntsteps += self.couplingdtfactor
+                    self.adcirctnext += self.adcircdt
+                if (self.nn.runflag == self.pu.off):
+                    ntsteps = (self.adcircntsteps-self.pmain.itime_bgn+1)
+                    self.adcirctnext = self.adcirctfinal
+
+                if self.pu.debug == self.pu.on and DEBUG_LOCAL != 0 and self.myid == 0:
+                    print("\n****************************************\nRunning ADCIRC:")
+                    print("dt             =", self.adcircdt)
+                    print("t_prev         =", self.adcirctprev)
+                    print("t_final        =", self.adcirctnext)
+                    print("ntsteps        =", ntsteps)
+                elif self.myid==0:
+                    print("\n****************************************\nRunning ADCIRC:")
+
+                # Run ADCIRC
+                self.pmain.pyadcirc_run(ntsteps)
+                self.adcirctprev = (self.pmain.itime_bgn-1)*self.pg.dtdp + self.pg.statim*86400.0
+
+            else:
+                self.adcircrunflag=self.pu.off
+
+            ######################################################
+            ## Set NN Boundary conditions from ADCIRC
+            nn_set_bc_from_adcirc_depths(self)
+
+            ######################################################
+            if (self.nn.timer < self.nntfinal):
+                # Driving model must take at least one time step forward.
+                superdt = self.effectivenndt
+                while (self.nn.timer*self.nn.timefact + superdt < self.adcirctprev-self.effectivenndt+TIME_TOL):
+                    superdt += self.effectivenndt
+
+                self.nn.niter += int(max(1.0, (superdt+TIME_TOL)/self.nn.timefact))
+
+                if (self.adcircrunflag==self.pu.off): #If ADCIRC is done first, let NN finish off directly.
+                    self.nn.niter            = self.nntfinal
+
+                if self.nn._DEBUG == self.pu.on and DEBUG_LOCAL != 0 and self.myid == 0:
+                    print("\n*******************************************\nRunning NN:")
+                    print("dt             =", self.nn.dt)
+                    print("timer          =", self.nn.timer)
+                    print("niter          =", self.nn.niter)
+                    print("superdt        =", superdt)
+                    print("end time       =", self.nn.timer*self.nn.timefact + superdt)
+                elif self.myid==0:
+                    print("\n*******************************************\nRunning NN:")
+
+                # Run NN only on 1 processsor: PE 0.
+                if self.myid == 0:
+                    #self.elevTS.updateTimeInterval(self.nn.timer*self.nn.timefact)
+                    ierr_code = self.nn.run()
+                    assert(ierr_code == 0)
+                    # Needed to force nn to run for next time step:
+                    self.nn.go    = self.pu.on
+                else:
+                    # Note: We are keeping nn.runflag as on, but nn.go as FALSE!!
+                    # This matters in adcirc_set_bc functions!
+                    self.nn.go    = self.pu.off
+                if self.pu.messg == self.pu.on:
+                    if (self.pu.debug ==self.pu.on or DEBUG_LOCAL != 0):
+                        print('PE[{}] Before messg: timer = {}'.format(self.myid,self.nn.timer))
+                    self.nn.timer = self.pmsg.pymsg_dbl_max(ctypes_c_double(self.nn.timer), self.adcirc_comm_comp)
+                    if (self.pu.debug ==self.pu.on or DEBUG_LOCAL != 0):
+                        print('PE[{}] After messg : timer = {}'.format(self.myid,self.nn.timer))
+
+            else:
+                self.nn.runflag = self.pu.off
+                self.nn.go    = self.pu.off
+
+            ######################################################
+            # Set ADCIRC Boundary conditions from NN
+            if self.couplingtype == 'AdndA':
+                adcirc_set_bc_from_nn_hydrograph(self)
 
     #--------------------------------------------------------------------------#
     def coupler_run(self):
