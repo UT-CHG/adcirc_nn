@@ -12,8 +12,8 @@ from pyADCIRC import libadcpy
 
 from .adcirc_init_bc_func import adcirc_init_bc_from_nn_hydrograph
 from .adcirc_set_bc_func  import adcirc_set_bc_from_nn_hydrograph
-from .nn_init_bc_func import nn_init_bc_from_adcirc_depths
-from .nn_set_bc_func  import nn_set_bc_from_adcirc_depths
+#from .nn_init_bc_func import nn_init_bc_from_adcirc_depths
+#from .nn_set_bc_func  import nn_set_bc_from_adcirc_depths
 from .lstmnn import LongShortTermMemoryNN_class as nn
 from .input_ts import InputTS
 
