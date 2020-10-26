@@ -248,6 +248,8 @@ class AdcircNN():
             ## Set NN Boundary conditions from ADCIRC
             if self.couplingtype == 'ndAdn':
                 nn_set_bc_from_adcirc_depths(self)
+        
+        self.nn.finalize()
 
     #--------------------------------------------------------------------------#
     def coupler_run_adcirc_driving_nn(self):
@@ -340,6 +342,8 @@ class AdcircNN():
             # Set ADCIRC Boundary conditions from NN
             if self.couplingtype == 'AdndA':
                 adcirc_set_bc_from_nn_hydrograph(self)
+
+        self.nn.finalize()
 
     #--------------------------------------------------------------------------#
     def coupler_run(self):

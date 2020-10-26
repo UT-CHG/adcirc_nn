@@ -73,12 +73,13 @@ class LongShortTermMemoryNN_class():
         self.tfinal = self.niter
 
         # load LSTM model
-        nn_input_dir = "nn_input"
-        self.nn_model = self._load_nn_model(nn_input_dir) # provide path if not in the same folder
+        self.nn_input_dir = "nn_input"
+        self.nn_model = self._load_nn_model(self.nn_input_dir)
         self.hidden = (self.nn_model.c0, self.nn_model.h0)
 
         # load nn input data
-        df = pd.read_csv(ospathjoin(nn_input_dir, "event.csv"))#, nrows = 9)
+        self.df = pd.read_csv(ospathjoin(self.nn_input_dir, "event.csv"))
+        # self.niter = len(self.df) # let lstm nn run all the time steps of the input event
         self.featurecols = [
             '43057',
             '43060',
@@ -97,7 +98,7 @@ class LongShortTermMemoryNN_class():
             '43055',
             "Verified (ft)",
         ]
-        self.features = df[self.featurecols] # TODO: overwrite this variable during two way coupling
+        self.features = self.df[self.featurecols] 
         self.series_rain_val = self.features[self.featurecols[:-2]]
         self.series_elev_val = self.features[self.featurecols[-1]]
         self.series_elev_time = self.timefact * np.asfortranarray(
@@ -105,8 +106,9 @@ class LongShortTermMemoryNN_class():
                           self.timer+len(self.series_elev_val)*self.dt,
                           self.dt))
 
-        self.X_scaler, self.y_scaler = self._load_meta(nn_input_dir)
-        assert (self.niter <= len(df)), "lstm model does not have enough input data"
+        self.X_scaler, self.y_scaler = self._load_meta(self.nn_input_dir)
+        self.prediction = []
+        assert (self.niter <= len(self.df)), "lstm model does not have enough input data"
 
     #--------------------------------------------------------------------------#
     def run(self):
@@ -124,6 +126,7 @@ class LongShortTermMemoryNN_class():
             y, self.hidden = self.nn_model(X, self.hidden)
             y = y.view(-1).detach().numpy()
             self.elev = self.y_scaler.inverse_transform(y.reshape(1, -1)) * self.length_factor
+            self.prediction.append(self.elev)
 
             # Increment model time
             self.timer += self.dt
@@ -133,8 +136,10 @@ class LongShortTermMemoryNN_class():
     #--------------------------------------------------------------------------#
     def finalize(self):
         """Finalize LSTM NN object."""
-        # Do nothing for now
-        pass
+        self.prediction = np.array(self.prediction).reshape(-1)
+        self.df['coupled_prediction'] = None
+        self.df['coupled_prediction'][:len(self.prediction)] = self.prediction
+        self.df.to_csv(ospathjoin(self.nn_input_dir, "event_pred.csv"))
 
 
     def _load_meta(self,path=''):
