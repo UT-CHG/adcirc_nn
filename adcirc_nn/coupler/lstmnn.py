@@ -64,7 +64,7 @@ class LongShortTermMemoryNN_class():
         # Hard-coded values for now:
         self.dt = 1 # 1 for one hour for now
         self.timer = 0
-        self.niter = 100
+        self.niter = 144
         # self.elbcfunc = lambda t : 5.0e0*(1-np.cos(2.0*np.pi * t / self.tfinal))
         #self.dummytimes = np.arange(0.0, self.dt*5, self.tfinal)
         #self.dummyvalues = 1.0e3*(1-np.cos(4.0*np.pi/self.dummytimes))
