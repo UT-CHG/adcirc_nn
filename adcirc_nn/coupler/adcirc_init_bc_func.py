@@ -55,7 +55,7 @@ def adcirc_init_bc_from_nn_hydrograph(anns): # anns is an AdcircNN_class object
     ##################################################
     # Replace the elevation times and values.
     db_el_StartIndex=sum(anns.pb.nvdll[:anns.adcircedgestringid])
-    anns.pg.esbin2[db_el_StartIndex : db_el_StartIndex+anns.adcircedgestringnnodes+1] = 0.0
+    anns.pg.esbin2[db_el_StartIndex : db_el_StartIndex+anns.adcircedgestringnnodes] = 0.0
     with open(anns.adcircfort19pathname, 'w') as fort19file:
         #Set series value to zero
         #anns.adcircseries[0].entry[i].value[0] = 0.0
