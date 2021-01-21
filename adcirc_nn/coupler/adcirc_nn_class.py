@@ -118,10 +118,10 @@ class AdcircNN():
         self.adcircntsteps=0+self.pmain.itime_end #Needed 0+ to prevent the two from being the same object :-/ Careful!!!!
         self.adcircfort19pathname=''.join(np.append(np.char.strip(self.ps.inputdir),'/fort.19.new'))
         self.adcircedgestringid=int(argv[argc.value-1])-1
-        self.adcircedgestringnnodes=self.pb.nvell[self.adcircedgestringid]
-        self.adcircedgestringnodes=self.pb.nbvv[1:self.adcircedgestringnnodes]
+        self.adcircedgestringnnodes=self.pb.nvdll[self.adcircedgestringid]
+        #self.adcircedgestringnodes=self.pb.nbvv[1:self.adcircedgestringnnodes]
         self.adcirc_coupled_nnodes=1
-        self.adcirc_coupled_nodes=np.asfortranarray([1])
+        self.adcirc_coupled_nodes=np.asfortranarray([1985])
 
         self.nn.initialize()
         self.nn.runflag=self.pu.on
@@ -248,7 +248,7 @@ class AdcircNN():
             ## Set NN Boundary conditions from ADCIRC
             if self.couplingtype == 'ndAdn':
                 nn_set_bc_from_adcirc_depths(self)
-        
+
         self.nn.finalize()
 
     #--------------------------------------------------------------------------#
