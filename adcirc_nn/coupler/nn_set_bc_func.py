@@ -14,7 +14,7 @@ def nn_set_bc_from_adcirc_depths(anns): # anns is of type adcircnntruct.
 
     # ts = anns.nn.features[anns.nn.features.columns[-1]].values[:]]
     num_vals = len(anns.nn.features)
-    if (anns.pu.debug ==anns.pu.on or anns.nn._DEBUG == anns.pu.ON) and DEBUG_LOCAL != 0 and anns.myid == 0:
+    if (anns.pu.debug ==anns.pu.on or anns.nn._DEBUG == anns.pu.on) and DEBUG_LOCAL != 0 and anns.myid == 0:
         print()
         for i in range(num_vals-SERIESLENGTH, num_vals):
             print('Before:(t,v)[{0}] = ({1}, {2})'.format(i,anns.elevTS.times[i],anns.elevTS.values[i]))
@@ -131,7 +131,7 @@ def nn_set_bc_from_adcirc_depths(anns): # anns is of type adcircnntruct.
         anns.elevTS.values[:-1] = anns.elevTS.values[1:]
         anns.elevTS.times[num_vals-1] += anns.elevTS.times[num_vals-3]-anns.elevTS.times[num_vals-4]
 
-    if (anns.pu.debug == anns.pu.on or anns.nn._DEBUG == anns.pu.ON) and DEBUG_LOCAL != 0 and anns.myid == 0:
+    if (anns.pu.debug == anns.pu.on or anns.nn._DEBUG == anns.pu.on) and DEBUG_LOCAL != 0 and anns.myid == 0:
         print('Current NN time = {0}'.format(anns.nn.timer*anns.nn.timefact))
         #print(anns.nn.features[anns.nn.featurecols[-1]])
         #assert(anns.nn.timer*anns.nn.timefact <= anns.elevTS.times[num_vals-2])

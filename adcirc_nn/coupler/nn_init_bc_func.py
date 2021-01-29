@@ -51,7 +51,7 @@ def nn_init_bc_from_adcirc_depths(anns): # anns is of type adcircnnstruct.
 
     ######################################################
     num_vals = len(anns.nn.features)
-    if (anns.pu.debug == anns.pu.on or anns.nn._DEBUG == anns.pu.ON) and DEBUG_LOCAL != 0 and anns.myid == 0:
+    if (anns.pu.debug == anns.pu.on or anns.nn._DEBUG == anns.pu.on) and DEBUG_LOCAL != 0 and anns.myid == 0:
         print('\nSetting up Boundary time series for NN.')
         for i in range(num_vals-SERIESLENGTH, num_vals):
             print('Before:(t,v)[{0}] = ({1}, {2})'.format(i,anns.elevTS.times[i],anns.elevTS.values[i]))
@@ -93,7 +93,7 @@ def nn_init_bc_from_adcirc_depths(anns): # anns is of type adcircnnstruct.
     #print(anns.nn.features[anns.nn.featurecols[-1]].values)
     #print(anns.nn.features[anns.nn.featurecols[-1]])
 
-    if (anns.pu.debug == anns.pu.on or anns.nn._DEBUG == anns.pu.ON) and DEBUG_LOCAL != 0 and anns.myid == 0:
+    if (anns.pu.debug == anns.pu.on or anns.nn._DEBUG == anns.pu.on) and DEBUG_LOCAL != 0 and anns.myid == 0:
         print('Current NN time = {0}'.format(anns.nn.timer*anns.nn.timefact))
         #print(anns.nn.features[anns.nn.featurecols[-1]])
         for i in range(num_vals-SERIESLENGTH, num_vals):
