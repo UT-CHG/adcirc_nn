@@ -30,9 +30,12 @@ def nn_set_bc_from_adcirc_depths(anns): # anns is of type adcircnntruct.
         my_avg_delta_eta=0.0
         my_eta_sum=0.0
 
-        for inode in range(1,anns.adcircedgestringnnodes+1):
+        #for inode in range(1,anns.adcircedgestringnnodes+1):
+        #    # -1 needed below since Python is 0 indexed whereas Fortan node numbers are 1-indexed
+        #    node = anns.pb.nbvv[anns.adcircedgestringid][inode]-1
+        for inode in range(anns.adcirc_cpld_elev_feedback_nnodes):
             # -1 needed below since Python is 0 indexed whereas Fortan node numbers are 1-indexed
-            node = anns.pb.nbvv[anns.adcircedgestringid][inode]-1
+            node = anns.adcirc_cpld_elev_feedback_nodes[inode]-1
             eta     = anns.pg.eta2[node]
             old_eta = anns.adcirc_hprev #Previous saved eta. #anns.pg.eta1[node]
             my_eta_sum       += eta
@@ -66,6 +69,14 @@ def nn_set_bc_from_adcirc_depths(anns): # anns is of type adcircnntruct.
             print("PE[{0}] Edge string({1}): Maximum delta_eta = {2}".format(anns.myid, anns.adcircedgestringid, max_delta_eta))
             print("PE[{0}] Edge string({1}): Minimum delta_eta = {2}".format(anns.myid, anns.adcircedgestringid, min_delta_eta))
             print("PE[{0}] Edge string({1}): Average delta_eta = {2}".format(anns.myid, anns.adcircedgestringid, avg_delta_eta))
+
+        # NOTE:
+        # Unit of elevations in elevTS.values here is meters, same as that of
+        # ADCIRC. Unit of time in elevTS.times is in seconds.
+        # However, the neural network uses ft as units, so we must convert
+        # meters to feet when setting the Neural Network's water elevations.
+        # Also, the neural network time stamps and time steps are in hours, so
+        # we must convert hours to seconds when setting time values.
 
         # Shift the time series and reset last accessed index
         anns.elevTS.times[:-1] = anns.elevTS.times[1:]
@@ -105,12 +116,14 @@ def nn_set_bc_from_adcirc_depths(anns): # anns is of type adcircnntruct.
         anns.elevTS.values[num_vals-1] = anns.elevTS.values[num_vals-2]
 
         # Set the values in the NN model.
-        #anns.nn.features[anns.nn.featurecols[-1]].values[:] = anns.elevTS.values[:]
         #print(anns.elevTS.current_index, anns.nn.timer*anns.nn.timefact)
         anns.elevTS._getTimeInterval(anns.nn.timer*anns.nn.timefact)
-        value = anns.elevTS.interpolate(anns.nn.timer*anns.nn.timefact)
+        #print(anns.nn.features[anns.nn.featurecols[-1]])
+        value = anns.elevTS.interpolate(anns.nn.timer*anns.nn.timefact) # in meters
         #print(anns.elevTS.current_index, anns.nn.timer, value)
-        anns.nn.features[anns.nn.featurecols[-1]].values[anns.nn.timer] = value
+        anns.nn.features[anns.nn.featurecols[-1]].values[anns.nn.timer] = \
+                value / anns.nn.length_factor # in feet.
+        #print(anns.nn.features[anns.nn.featurecols[-1]])
 
     else:
 

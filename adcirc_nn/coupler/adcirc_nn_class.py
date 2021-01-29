@@ -10,8 +10,10 @@ import numpy as np
 
 from pyADCIRC import libadcpy
 
-from .adcirc_init_bc_func import adcirc_init_bc_from_nn_hydrograph
-from .adcirc_set_bc_func  import adcirc_set_bc_from_nn_hydrograph
+from .adcirc_init_bc_func import adcirc_init_flux_bc_from_nn_hydrograph, \
+                                 adcirc_init_elev_bc_from_nn_hydrograph
+from .adcirc_set_bc_func  import adcirc_set_flux_bc_from_nn_hydrograph, \
+                                 adcirc_set_elev_bc_from_nn_hydrograph
 from .nn_init_bc_func import nn_init_bc_from_adcirc_depths
 from .nn_set_bc_func  import nn_set_bc_from_adcirc_depths
 from .lstmnn import LongShortTermMemoryNN_class as nn
@@ -60,9 +62,10 @@ class AdcircNN():
         self.adcircedgestringid=self.pu.unset_int
         self.adcircedgestringnnodes=self.pu.unset_int
         self.adcircedgestringlen=0.0
-        self.adcirc_coupled_nnodes=0
-        self.adcirc_coupled_nodes=[]
+        self.adcirc_cpld_elev_feedback_nnodes=0
+        self.adcirc_cpld_elev_feedback_nodes=[]
         self.adcircfort19pathname=''
+        self.adcircfort20pathname=''
         self.adcirc_hprev=0.0   # Avg depth
         self.adcirc_hprev_len=0.0   # count
 
@@ -117,11 +120,17 @@ class AdcircNN():
         self.adcirctfinal=(self.pg.statim + self.pg.rnday)*86400.0
         self.adcircntsteps=0+self.pmain.itime_end #Needed 0+ to prevent the two from being the same object :-/ Careful!!!!
         self.adcircfort19pathname=''.join(np.append(np.char.strip(self.ps.inputdir),'/fort.19.new'))
+        self.adcircfort20pathname=''.join(np.append(np.char.strip(self.ps.inputdir),'/fort.20.new'))
         self.adcircedgestringid=int(argv[argc.value-1])-1
-        self.adcircedgestringnnodes=self.pb.nvdll[self.adcircedgestringid]
-        #self.adcircedgestringnodes=self.pb.nbvv[1:self.adcircedgestringnnodes]
-        self.adcirc_coupled_nnodes=1
-        self.adcirc_coupled_nodes=np.asfortranarray([1985])
+        self.adcircedgestringnnodes=self.pb.nvell[self.adcircedgestringid]  #Flux
+        #self.adcircedgestringnnodes=self.pb.nvdll[self.adcircedgestringid] #Elev
+        self.adcircedgestringnodes=self.pb.nbvv[self.adcircedgestringid][1:self.adcircedgestringnnodes+1]
+        self.adcirc_cpld_elev_feedback_nnodes=1
+        # Node numbers below are 1-index:
+        self.adcirc_cpld_elev_feedback_nodes=np.asfortranarray([1985]) # Morgan's point
+        #self.adcirc_cpld_elev_feedback_nodes=np.asfortranarray([4653]) # Brays @ MLK #1
+        #self.adcirc_cpld_elev_feedback_nnodes=self.adcircedgestringnnodes # Brays @ MLK #2
+        #self.adcirc_cpld_elev_feedback_nodes=self.adcircedgestringnodes   # Brays @ MLK #2
 
         self.nn.initialize()
         self.nn.runflag=self.pu.on
@@ -147,7 +156,8 @@ class AdcircNN():
         """Run function with NN staying ahead of ADCIRC."""
 
         # Todo
-        adcirc_init_bc_from_nn_hydrograph(self)
+        adcirc_init_flux_bc_from_nn_hydrograph(self)
+        #adcirc_init_elev_bc_from_nn_hydrograph(self)
         if self.couplingtype == 'ndAdn':
             nn_init_bc_from_adcirc_depths(self)
 
@@ -216,7 +226,8 @@ class AdcircNN():
 
             ######################################################
             # Set ADCIRC Boundary conditions from NN
-            adcirc_set_bc_from_nn_hydrograph(self)
+            adcirc_set_flux_bc_from_nn_hydrograph(self)
+            #adcirc_set_elev_bc_from_nn_hydrograph(self)
 
             ######################################################
             if (self.adcirctprev < self.adcirctfinal):
@@ -257,7 +268,8 @@ class AdcircNN():
 
         nn_init_bc_from_adcirc_depths(self)
         if self.couplingtype == 'AdndA':
-            adcirc_init_bc_from_nn_hydrograph(self)
+            adcirc_init_flux_bc_from_nn_hydrograph(self)
+            #adcirc_init_elev_bc_from_nn_hydrograph(self)
 
         # Set final times to zero.
         self.pmain.itime_end = 0
@@ -341,7 +353,8 @@ class AdcircNN():
             ######################################################
             # Set ADCIRC Boundary conditions from NN
             if self.couplingtype == 'AdndA':
-                adcirc_set_bc_from_nn_hydrograph(self)
+                adcirc_set_flux_bc_from_nn_hydrograph(self)
+                #adcirc_set_elev_bc_from_nn_hydrograph(self)
 
         self.nn.finalize()
 

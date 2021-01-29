@@ -21,6 +21,7 @@ from .RunoffLSTM import RunoffLSTM
 
 NN_TIME_FACTOR = 3600.0 # Conversion factor for hours to seconds
 NN_LENGTH_FACTOR = 0.3048 # Ft to meter conversion
+NN_DISCHARGE_FACTOR = 0.028316846592 # Ft3/s to meter3/s conversion
 
 #------------------------------------------------------------------------------#
 class LongShortTermMemoryNN_class():
@@ -32,28 +33,38 @@ class LongShortTermMemoryNN_class():
 
         self._DEBUG = 0
 
-        self.dt = 0.0  # Double in seconds
+        self.dt = 0    # Integer in hours
         self.timer = 0 # Integer in seconds
         self.niter = 0 # Integer in seconds
         self.go = 1 # Integer flag for running or not running the model
 
         self.tprev = 0.0 # Double in seconds  # To be set to timer
         self.tfinal = 0.0 # Double in seconds # To be set to niter
+
         self.elevprev=0.0
         self.elevprev_t=0.0
 
+        self.qoutprev=0.0    # NN Discharge
+        self.qoutprev_t=0.0
+        self.voutprev=0.0    # Calculated outflow volume
+
         self.timefact=NN_TIME_FACTOR # Minutes to seconds conversion.
         self.length_factor = NN_LENGTH_FACTOR # TODO: remember to do this conversion from adc to nn
+        self.discharge_factor = NN_DISCHARGE_FACTOR # TODO: remember to do this conversion from adc to nn
 
         #self.dummytimes = 0.0
         #self.dummyvalues = 0.0
         self.elev = 0.0
+        self.qout = 0.0
+        self.vout = 0.0
 
         self.features = [] # Features used by the neural network model
         self.featurecols = [] # Feature column names
         self.series_rain_val = [] # Subset of features - Rainfall
         self.series_elev_val = [] # Subset of features - Elevation
         self.series_elev_time = [] # Subset of features - Elevation
+        #self.series_qout_val = [] # Subset of features - Flux
+        #self.series_qout_time = [] # Subset of features - Flux
 
         self.runflag = 1 # Only for use in coupling with ADCIRC.
 
@@ -96,11 +107,14 @@ class LongShortTermMemoryNN_class():
             '43056',
             '43091',
             '43055',
-            "Verified (ft)",
+            #"Height",         # Brays at MLK outlet
+            "Verified (ft)", # Morgan's point
         ]
-        self.features = self.df[self.featurecols] 
+        self.features = self.df[self.featurecols]
         self.series_rain_val = self.features[self.featurecols[:-2]]
-        self.series_elev_val = self.features[self.featurecols[-1]]
+
+        self.series_elev_val = self.features[self.featurecols[-1]] * \
+                               self.length_factor # Conversion from ft to m.
         self.series_elev_time = self.timefact * np.asfortranarray(
                 np.arange(self.timer,
                           self.timer+len(self.series_elev_val)*self.dt,
@@ -125,8 +139,19 @@ class LongShortTermMemoryNN_class():
             X = torch.Tensor(X).view(1, 1, -1)
             y, self.hidden = self.nn_model(X, self.hidden)
             y = y.view(-1).detach().numpy()
-            self.elev = self.y_scaler.inverse_transform(y.reshape(1, -1)) * self.length_factor
-            self.prediction.append(self.elev)
+
+            # Elevation coupling
+            #self.elev = self.y_scaler.inverse_transform(y.reshape(1, -1)) * self.length_factor
+            #self.prediction.append(self.elev)
+
+            # Flux coupling
+            self.qout = self.y_scaler.inverse_transform(y.reshape(1, -1)) * self.discharge_factor
+            self.prediction.append(self.qout)
+            # Cumulative volume
+            # WARNING: This will be WRONG if the NN runs for multiple timesteps
+            # per coupling interval. This is valid only if NN runs for exactly 1
+            # time step!
+            self.vout = self.voutprev + (self.timefact*self.dt)*(self.qout+self.qoutprev)/2.0
 
             # Increment model time
             self.timer += self.dt
@@ -137,9 +162,9 @@ class LongShortTermMemoryNN_class():
     def finalize(self):
         """Finalize LSTM NN object."""
         self.prediction = np.array(self.prediction).reshape(-1)
-        self.df['coupled_prediction'] = None
-        self.df['coupled_prediction'][:len(self.prediction)] = self.prediction
-        self.df.to_csv(ospathjoin(self.nn_input_dir, "event_pred.csv"))
+        self.features['coupled_prediction'] = None
+        self.features['coupled_prediction'][:len(self.prediction)] = self.prediction
+        self.features.to_csv(ospathjoin(self.nn_input_dir, "event_pred.csv"))
 
 
     def _load_meta(self,path=''):

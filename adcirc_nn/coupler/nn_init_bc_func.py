@@ -22,9 +22,11 @@ def nn_init_bc_from_adcirc_depths(anns): # anns is of type adcircnnstruct.
     my_min_eta =  1.0e+200
     count=0.0
 
-    for inode in range(anns.adcirc_coupled_nnodes):
+    print('Coupled nnodes = ', anns.adcirc_cpld_elev_feedback_nnodes)
+    print('Coupled nodes = [', anns.adcirc_cpld_elev_feedback_nodes, ']')
+    for inode in range(anns.adcirc_cpld_elev_feedback_nnodes):
         # -1 needed below since Python is 0 indexed whereas Fortan node numbers are 1-indexed
-        node = anns.adcirc_coupled_nodes[inode]-1
+        node = anns.adcirc_cpld_elev_feedback_nodes[inode]-1
         eta = anns.pg.eta2[node]
         my_eta_sum += eta
         my_max_eta = max(my_max_eta, eta)
@@ -71,14 +73,25 @@ def nn_init_bc_from_adcirc_depths(anns): # anns is of type adcircnnstruct.
     # This is not done in the NN features variable (see below).
     anns.elevTS.values[:] = anns.elevTS.values[0]
 
+    # NOTE:
+    # Unit of elevations in elevTS.values here is meters, same as that of
+    # ADCIRC. Unit of time in elevTS.times is in seconds.
+    # However, the neural network uses ft as units, so we must convert
+    # meters to feet when setting the Neural Network's water elevations.
+    # Also, the neural network time stamps and time steps are in hours, so
+    # we must convert hours to seconds when setting time values.
+    # The above note is a copy of the note in nn_set_bc_func.py.
+
     # Set the values in the NN model.
-    #anns.nn.features[anns.nn.featurecols[-1]].values[:] = anns.elevTS.values[:]
     #print(anns.elevTS.current_index, anns.nn.timer*anns.nn.timefact)
     anns.elevTS._getTimeInterval(anns.nn.timer*anns.nn.timefact)
-    value = anns.elevTS.interpolate(anns.nn.timer*anns.nn.timefact)
+    value = anns.elevTS.interpolate(anns.nn.timer*anns.nn.timefact) # in meters
     #print(anns.elevTS.current_index, anns.nn.timer, value)
     #print(anns.nn.features[anns.nn.featurecols[-1]])
-    anns.nn.features[anns.nn.featurecols[-1]].values[anns.nn.timer] = value
+    anns.nn.features[anns.nn.featurecols[-1]].values[anns.nn.timer] = \
+            value / anns.nn.length_factor # in ft.
+    #print(anns.nn.features[anns.nn.featurecols[-1]].values)
+    #print(anns.nn.features[anns.nn.featurecols[-1]])
 
     if (anns.pu.debug == anns.pu.on or anns.nn._DEBUG == anns.pu.ON) and DEBUG_LOCAL != 0 and anns.myid == 0:
         print('Current NN time = {0}'.format(anns.nn.timer*anns.nn.timefact))
