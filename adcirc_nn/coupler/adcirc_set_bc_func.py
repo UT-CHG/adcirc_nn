@@ -15,10 +15,10 @@ def adcirc_set_bc_from_nn_hydrograph(ags): # ags is an Adcirc_NN_class object.
     # Note: ags.adcircseries already points to the head of series in ADCIRC that needs to be modified.
     db_el_StartIndex=sum(ags.pb.nvdll[:ags.adcircedgestringid])
     if ags.pu.debug == ags.pu.on and DEBUG_LOCAL != 0 and ags.myid==0:
-        print(f"\nOriginal: Flux time increment ETIMINC = {ags.pg.etiminc}"
-                f"\nOriginal: Flux times:\nETIME1 = {ags.pg.etime1}"
+        print(f"\nOriginal: Elev time increment ETIMINC = {ags.pg.etiminc}"
+                f"\nOriginal: Elev times:\nETIME1 = {ags.pg.etime1}"
                 f"\nETIME2 = {ags.pg.etime2}"
-                f"\nOriginal: Flux values:\nESBIN1  = {ags.pg.esbin1[db_el_StartIndex : db_el_StartIndex+ags.adcircedgestringnnodes]}"
+                f"\nOriginal: Elev values:\nESBIN1  = {ags.pg.esbin1[db_el_StartIndex : db_el_StartIndex+ags.adcircedgestringnnodes]}"
                 f"\nESBIN2  = {ags.pg.esbin2[db_el_StartIndex : db_el_StartIndex+ags.adcircedgestringnnodes]}")
 
     if ags.pu.messg == ags.pu.on:
@@ -113,7 +113,7 @@ def adcirc_set_bc_from_nn_hydrograph(ags): # ags is an Adcirc_NN_class object.
         # Replace the fort.19 file.
         with open(ags.adcircfort19pathname, 'w') as fort19file:
             [fort19file.write('0.0\n') for i in range(ags.adcircedgestringnnodes*SERIESLENGTH)]
-        # Reset the flux time increment
+        # Reset the elevation time increment
         # Gajanan gkc warning: Note that this will cause a problem if there are multiple non-zero-flux boundaries!!!
         ags.pg.etiminc = abs(ags.adcirctfinal)*10.0
 
@@ -123,10 +123,10 @@ def adcirc_set_bc_from_nn_hydrograph(ags): # ags is an Adcirc_NN_class object.
     assert(errorio==0)
 
     if ags.pu.debug == ags.pu.on and DEBUG_LOCAL != 0:
-        print(f"Replaced: Flux time increment ETIMINC = {ags.pg.etiminc}"
-                f"\nReplaced: Flux times:\nETIME1 = {ags.pg.etime1}"
+        print(f"Replaced: Elev time increment ETIMINC = {ags.pg.etiminc}"
+                f"\nReplaced: Elev times:\nETIME1 = {ags.pg.etime1}"
                 f"\nETIME2 = {ags.pg.etime2} "
-                f"\nReplaced: Flux values:\nESBIN1  = {ags.pg.esbin1[db_el_StartIndex : db_el_StartIndex+ags.adcircedgestringnnodes]}"
+                f"\nReplaced: Elev values:\nESBIN1  = {ags.pg.esbin1[db_el_StartIndex : db_el_StartIndex+ags.adcircedgestringnnodes]}"
                 f"\nESBIN2  = {ags.pg.esbin2[db_el_StartIndex : db_el_StartIndex+ags.adcircedgestringnnodes]}")
         print(f'Area   contained  = {ags.adcircseriesarea}')
         print(f'Volume contained  = {ags.adcircseriesarea*ags.adcircedgestringlen}')
