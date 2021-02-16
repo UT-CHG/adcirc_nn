@@ -1,0 +1,61 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+
+name: Test using Python 3.6
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    #--------------------------------------------------------------------------#
+    - name: Checkout AdcircNN
+      uses: actions/checkout@v2
+
+    - name: Checkout pyADCIRC-containing branch of Gajanan Choudhary's ADCIRC repo fork
+      uses: actions/checkout@v2
+      with:
+        repository: gajanan-choudhary/adcirc-cg
+        token: ${{secrets.TBD_ACCESS_TOKEN}}
+        ref: pyadcirc
+
+    - name: Checkout AdcircNN tests repository
+      uses: actions/checkout@v2
+      with:
+        repository: UT-CHG/adcirc_nn_tests
+
+    #--------------------------------------------------------------------------#
+    - name: Set up Python 3.6
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.6
+    - name: Upgrade pip
+      run:
+          python -m pip install --upgrade pip
+
+    #--------------------------------------------------------------------------#
+    - name: Install pyADCIRC
+      run: |
+          cd $GITHUB_WORKSPACE/adcirc-cg/work
+          make libadcpy
+          cd ..
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          python -m pip install .
+
+    - name: Install AdcircNN
+      run: |
+          cd $GITHUB_WORKSPACE/adcirc_nn
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          python -m pip install .
+      env:
+          LD_LIBRARY_PATH: $GITHUB_WORKSPACE/adcirc-cg/work:$LD_LIBRARY_PATH
+
+    #--------------------------------------------------------------------------#
+    - name: Run tests for AdcircNN  -- TBD!
+      run: |
+          cd $GITHUB_WORKSPACE/adcirc_nn_tests/large/
+          python  -m  adcirc_nn  ndA  1
