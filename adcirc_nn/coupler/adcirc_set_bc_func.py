@@ -108,7 +108,7 @@ def adcirc_set_elev_bc_from_nn_hydrograph(ags): # ags is an Adcirc_NN_class obje
     else:
         # Shift values backward
         ags.pg.etime1 = ags.pg.etime2
-        for i in range(ags.pb.neta*2):
+        for i in range(ags.pb.neta):
             ags.pg.esbin1[i] = ags.pg.esbin2[i]
         # Replace the fort.19 file.
         with open(ags.adcircfort19pathname, 'w') as fort19file:
@@ -251,7 +251,7 @@ def adcirc_set_flux_bc_from_nn_hydrograph(ags): # ags is an Adcirc_NN_class obje
     else:
         # Shift values backward
         ags.pg.qtime1 = ags.pg.qtime2
-        for i in range(ags.pb.nvel*2):
+        for i in range(ags.pb.nvel):
             ags.pg.qnin1[i] = ags.pg.qnin2[i]
         # Replace the fort.20 file.
         with open(ags.adcircfort20pathname, 'w') as fort20file:
